@@ -45,9 +45,3 @@ git push
   Accessibility reads 96 only because Lighthouse doesn't scroll, so it sees below-the-fold text
   in its faded "waiting to reveal" state. Once scrolled, contrast is full.
 - No horizontal scroll at 390, 820 or 1440 px; all images and links resolve.
-
-## Adding a custom domain
-
-1. Add A records at your registrar pointing to GitHub's IPs (`185.199.108–111.153`)
-2. Add a CNAME record: `www` → `ohektner.github.io`
-3. Set the custom domain in repo Settings → Pages
