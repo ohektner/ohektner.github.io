@@ -1,6 +1,7 @@
 # Owen Hektner — Portfolio
 
-Personal site. Live at [ohek54.github.io/Portfolio](https://ohek54.github.io/Portfolio).
+Personal site. Live at [ohektner.github.io](https://ohektner.github.io). Moved from ohek54/Portfolio in October 2026;
+the old address forwards here from the `ohek54/ohek54.github.io` repo.
 
 ## Stack
 
@@ -48,5 +49,5 @@ git push
 ## Adding a custom domain
 
 1. Add A records at your registrar pointing to GitHub's IPs (`185.199.108–111.153`)
-2. Add a CNAME record: `www` → `ohek54.github.io`
+2. Add a CNAME record: `www` → `ohektner.github.io`
 3. Set the custom domain in repo Settings → Pages
