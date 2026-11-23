@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Can Ratings Beat the Line? · Owen Hektner</title>
+<meta name="description" content="Shac SB Index case study: a college basketball model tested against the betting market three ways, with each test's rules written down before it ran.">
+<link rel="canonical" href="https://ohektner.github.io/shac/">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Owen Hektner">
+<meta property="og:title" content="Can Ratings Beat the Line?">
+<meta property="og:description" content="Shac SB Index case study: a college basketball model tested against the betting market three ways, with each test's rules written down before it ran.">
+<meta property="og:url" content="https://ohektner.github.io/shac/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=Source+Sans+3:wght@400;600&display=swap">
+<style>
+  /* Layout: one reading column, a box-score summary table, one dot-and-interval chart, sections divided by hairlines. */
+  :root {
+    --paper: #f4f6f9;
+    --surface: #ffffff;
+    --ink: #141b2d;
+    --ink-2: #48526a;
+    --muted: #5f687b;
+    --rule: #dbe0e8;
+    --accent: #c4501b;
+    --mark: #8c95a6;
+    --font-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+    --font-body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+    --font-data: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #0e131d;
+      --surface: #151c29;
+      --ink: #e7ebf2;
+      --ink-2: #b2bac8;
+      --muted: #939cad;
+      --rule: #2a3349;
+      --accent: #d4672e;
+      --mark: #6e7890;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #0e131d;
+    --surface: #151c29;
+    --ink: #e7ebf2;
+    --ink-2: #b2bac8;
+    --muted: #939cad;
+    --rule: #2a3349;
+    --accent: #d4672e;
+    --mark: #6e7890;
+    color-scheme: dark;
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 17px;
+    line-height: 1.6;
+  }
+  .wrap {
+    max-width: 760px;
+    margin: 0 auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 48px 64px;
+    display: grid;
+    gap: 48px;
+  }
+  section { display: grid; gap: 14px; min-width: 0; }
+  section + section, .hero + section { border-top: 1px solid var(--rule); padding-top: 32px; }
+
+  .eyebrow {
+    font-family: var(--font-data);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0;
+  }
+  h1, h2 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    line-height: 1.05;
+    margin: 0;
+    text-wrap: balance;
+    letter-spacing: 0.005em;
+  }
+  h1 { font-size: clamp(2.6rem, 7vw, 4rem); }
+  h2 { font-size: 1.75rem; }
+  p { margin: 0; max-width: 65ch; }
+  .dek { font-size: 1.2rem; line-height: 1.5; color: var(--ink-2); }
+  .hero { display: grid; gap: 14px; }
+  .answer { font-weight: 600; color: var(--ink); }
+
+  a { color: var(--ink); text-decoration-color: var(--accent); text-underline-offset: 3px; text-decoration-thickness: 2px; }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+
+  /* Box score */
+  .scroll { overflow-x: auto; min-width: 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 15px; }
+  th, td { text-align: left; padding: 10px 12px 10px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th {
+    font-family: var(--font-data);
+    font-weight: 500;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid var(--ink);
+  }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.num { font-family: var(--font-data); font-size: 14px; }
+  .box td:first-child { font-weight: 600; white-space: nowrap; }
+  .verdict {
+    font-family: var(--font-data);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    border: 1px solid var(--rule);
+    padding: 2px 8px;
+    border-radius: 3px;
+    color: var(--ink-2);
+  }
+  .sub { color: var(--muted); font-size: 13px; display: block; }
+
+  /* Chart */
+  figure { margin: 0; display: grid; gap: 10px; min-width: 0; }
+  .chart-panel {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 16px 16px 8px;
+    position: relative;
+    min-width: 0;
+  }
+  .chart-title { font-weight: 600; margin: 0 0 2px; }
+  .chart-sub { color: var(--muted); font-size: 14px; margin: 0 0 8px; }
+  .chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .c-grid { stroke: var(--rule); stroke-width: 1; }
+  .c-zero { stroke: var(--ink-2); stroke-width: 1; }
+  .c-tick { fill: var(--muted); font-family: var(--font-data); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .c-label { fill: var(--ink-2); font-family: var(--font-body); font-size: 14px; }
+  .c-label.emph { fill: var(--ink); font-weight: 600; }
+  .c-value { fill: var(--ink); font-family: var(--font-data); font-size: 12px; font-weight: 500; }
+  .c-int { stroke: var(--mark); stroke-width: 2; stroke-linecap: round; }
+  .c-int.emph { stroke: var(--accent); }
+  .c-dot { fill: var(--mark); stroke: var(--surface); stroke-width: 2; }
+  .c-dot.emph { fill: var(--accent); }
+  .c-hit { fill: transparent; }
+  .c-row { cursor: default; outline: none; }
+  .c-row:focus-visible .c-hit { stroke: var(--accent); stroke-width: 2; }
+  .tip {
+    position: absolute;
+    pointer-events: none;
+    background: var(--ink);
+    color: var(--paper);
+    font-size: 13px;
+    line-height: 1.4;
+    padding: 8px 10px;
+    border-radius: 4px;
+    max-width: 240px;
+    z-index: 2;
+  }
+  .tip strong { display: block; }
+  .tip .t-num { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+  figcaption { color: var(--ink-2); font-size: 15px; }
+  details { font-size: 15px; }
+  summary { cursor: pointer; color: var(--ink-2); }
+  summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  details table { margin-top: 8px; }
+
+  /* Lists */
+  .checks { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; }
+  .checks li { display: grid; grid-template-columns: 7.5rem 1fr; gap: 12px; min-width: 0; }
+  .checks .k { font-family: var(--font-data); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); padding-top: 4px; }
+  .plain { margin: 0; padding-left: 1.2em; display: grid; gap: 8px; max-width: 65ch; }
+  .numbers { font-family: var(--font-data); font-size: 14px; font-variant-numeric: tabular-nums; }
+
+  footer { border-top: 1px solid var(--rule); padding-top: 24px; display: grid; gap: 8px; color: var(--ink-2); font-size: 15px; }
+
+  @media (max-width: 520px) {
+    body { font-size: 16px; }
+    .checks li { grid-template-columns: 1fr; gap: 2px; }
+    .checks .k { padding-top: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
+  .back { font-size: 15px; margin: 0; }
+</style>
+</head>
+<body>
+
+<main class="wrap">
+  <header class="hero">
+    <p class="back"><a href="../#work">&larr; Owen Hektner</a></p>
+    <p class="eyebrow">Shac SB Index · a college basketball forecasting model · Case study, November 2026</p>
+    <h1>Can ratings beat the line?</h1>
+    <p class="dek">A college basketball model built only from what was known before each tip-off, tested against the betting market three ways. Each test's rules were written down and published before it ran.</p>
+    <p class="answer">The answer was no all three times. How it was tested is the part worth reading.</p>
+  </header>
+
+  <section aria-labelledby="box-h">
+    <p class="eyebrow" id="box-h">The three tests</p>
+    <div class="scroll" tabindex="0" role="region" aria-label="The three tests, as a table">
+      <table class="box">
+        <thead>
+          <tr>
+            <th scope="col">Test</th>
+            <th scope="col">Judged against</th>
+            <th scope="col" class="num">Games</th>
+            <th scope="col" class="num">Result</th>
+            <th scope="col">Verdict</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1. The close</td>
+            <td>Last line before tip<span class="sub">2022-23 to 2025-26</span></td>
+            <td class="num">22,132</td>
+            <td class="num">50.3% ATS<span class="sub">1 Lean in 4 seasons</span></td>
+            <td><span class="verdict">No edge</span></td>
+          </tr>
+          <tr>
+            <td>2. The night before</td>
+            <td>Line at 10:20 p.m. ET<span class="sub">timed archive, 4 seasons</span></td>
+            <td class="num">18,299</td>
+            <td class="num">+0.015 pts CLV<span class="sub">95%: −0.002 to +0.031</span></td>
+            <td><span class="verdict">No edge</span></td>
+          </tr>
+          <tr>
+            <td>3. Perfect knowledge</td>
+            <td>Same line, games where a rotation player sat<span class="sub">who sat known in hindsight</span></td>
+            <td class="num">6,816</td>
+            <td class="num">+0.014 pts gain<span class="sub">95%: −0.004 to +0.032</span></td>
+            <td><span class="verdict">Already priced</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="chart-h">
+    <p class="eyebrow">Test 2 in one picture</p>
+    <h2 id="chart-h">The line moved toward v1 about as often as toward a coin flip</h2>
+    <figure>
+      <div class="chart-panel">
+        <p class="chart-title">Line movement toward each side, night before to tip</p>
+        <p class="chart-sub">CLV in points per game, 2022-23 to 2025-26. Lines show 95% intervals.</p>
+        <div class="chart" id="clv-chart" role="group" aria-label="Line movement toward each side rule, with 95% intervals"></div>
+      </div>
+      <figcaption>Closing line value (CLV) is how far the line moved toward a side between the call and tip-off. Beating the close consistently is how professional bettors judge themselves. v1 sits beside a coin flip. The only clear signals are drifts a one-line rule catches: over four seasons, lines moved toward home teams and away from underdogs.</figcaption>
+      <details>
+        <summary>Show as a table</summary>
+        <div class="scroll" tabindex="0" role="region" aria-label="CLV by side, as a table">
+          <table>
+            <thead>
+              <tr><th scope="col">Side taken</th><th scope="col" class="num">CLV</th><th scope="col" class="num">95% interval</th><th scope="col" class="num">ATS</th><th scope="col" class="num">Games</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Model v1</td><td class="num">+0.015</td><td class="num">−0.002 to +0.031</td><td class="num">50.1%</td><td class="num">18,299</td></tr>
+              <tr><td>Torvik's number</td><td class="num">+0.006</td><td class="num">−0.011 to +0.023</td><td class="num">50.2%</td><td class="num">18,299</td></tr>
+              <tr><td>Coin flip</td><td class="num">+0.013</td><td class="num">−0.004 to +0.029</td><td class="num">49.7%</td><td class="num">18,299</td></tr>
+              <tr><td>Always home</td><td class="num">+0.053</td><td class="num">+0.037 to +0.070</td><td class="num">50.1%</td><td class="num">18,299</td></tr>
+              <tr><td>Always the underdog</td><td class="num">−0.059</td><td class="num">−0.076 to −0.042</td><td class="num">49.8%</td><td class="num">18,033</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </figure>
+  </section>
+
+  <section aria-labelledby="t1-h">
+    <p class="eyebrow">Test 1</p>
+    <h2 id="t1-h">Against the closing line</h2>
+    <p>Model v1 is Bart Torvik's team ratings rebuilt from his archived daily files, so every prediction uses only the ratings published before that game. It weights the rating gap and home court from earlier seasons. Four extra inputs (early-season form, rest, offense versus defense, conference home court) were tried and none earned a place.</p>
+    <p>It met its first goal. Its distance to the closing line is a hair smaller than Torvik's own number (1.989 versus 2.006 points per game). Against the spread it went 50.3%, below the 52.4% needed to beat the standard −110 price. Calibrated, its chance of covering barely moves off 50%. A Lean would need about 20 points of disagreement with the line, which never happens.</p>
+    <p>This test also caught a data problem. The first run showed a 10–1 record on the strongest calls. Almost all of it came from historical lines with the right number on the wrong team, such as Duke −8.5 stored as Texas Tech −8.5. Two checks now drop those lines, and a hand check of six against public listings confirmed five, with the sixth likely.</p>
+  </section>
+
+  <section aria-labelledby="t2-h">
+    <p class="eyebrow">Test 2</p>
+    <h2 id="t2-h">Against the night-before line</h2>
+    <p>Professional bettors don't wait for the closing line. They take an early number and judge themselves by whether the line then moves their way. So the next question was whether v1 sees where early lines are heading.</p>
+    <p>A first read on one week of this season's games looked strong: +0.46 points of CLV. A control added afterwards showed why. That week, lines drifted toward underdogs, and "always take the underdog" earned +0.33. The model leans to underdogs, so most of its result was the drift.</p>
+    <p>The real test used a bought month of historical odds: 1,761 timed snapshots across four seasons, three per game day. Before any result was computed, two checks ran:</p>
+    <ul class="plain">
+      <li>The archive's closing lines matched the separate historical source to a median of 0.25 points. Passed.</li>
+      <li>At least 90% of games needed a line by 10:20 p.m. the night before. Two seasons fell short, at 82.0% and 89.7%, because about 8% of lines post only on game day. The decision to go ahead was recorded before any result existed.</li>
+    </ul>
+    <p>The result was +0.015 points per game, with a 95% interval that includes zero. The curve for turning edges into calls came out slightly negative, so there would be no calls at all.</p>
+  </section>
+
+  <section aria-labelledby="t3-h">
+    <p class="eyebrow">Test 3</p>
+    <h2 id="t3-h">With perfect knowledge of who sits</h2>
+    <p>The planned AI layer was meant to read injury and lineup news and act before the line moves. Before building it, a ceiling test asked a harder question: if we had known exactly which rotation players would miss each game, would the adjusted model beat the night-before line? Hindsight was used on purpose, so the real system could only do worse.</p>
+    <p>The adjustment followed the layer's approved spec. Each missing player was weighted by minutes played, and one learned value turned that into points. That value came out at about one point per full-time player, a real effect but a small one.</p>
+    <div class="scroll" tabindex="0" role="region" aria-label="Test 3 results">
+      <table>
+        <thead>
+          <tr><th scope="col">Games where a rotation player sat</th><th scope="col" class="num">CLV</th><th scope="col" class="num">95% interval</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>v1 as is</td><td class="num">+0.022</td><td class="num">−0.008 to +0.051</td></tr>
+          <tr><td>v1 plus who actually sat</td><td class="num">+0.036</td><td class="num">+0.006 to +0.065</td></tr>
+          <tr><td><strong>Gain from perfect knowledge</strong></td><td class="num"><strong>+0.014</strong></td><td class="num"><strong>−0.004 to +0.032</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>The rule fixed in advance judged the gain, and its interval includes zero. By 10:20 p.m. the night before, the market has already priced these absences about as well as a minutes-based adjustment can.</p>
+  </section>
+
+  <section aria-labelledby="honest-h">
+    <p class="eyebrow">Method</p>
+    <h2 id="honest-h">How the tests were kept honest</h2>
+    <ul class="checks">
+      <li><span class="k">Point in time</span><span>Each prediction uses the ratings file that existed before tip-off. Pinning down when each daily file became public caught a rule that would have leaked results from 52 late-night games.</span></li>
+      <li><span class="k">Rules first</span><span>Every test's method and pass/fail reading was committed to the public repo before it ran. The timestamps are in the pull request history.</span></li>
+      <li><span class="k">Checks first</span><span>Data checks run before any result. When one failed, the decision on what to do was written down before looking.</span></li>
+      <li><span class="k">Controls</span><span>Beating zero isn't enough. Each result is compared with a coin flip and with simple rules like "always home".</span></li>
+      <li><span class="k">Bad data out</span><span>Lines from one provider failed a closing-line test and were dropped. Lines on the wrong team were caught by the fake 10–1 record and removed.</span></li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="means-h">
+    <p class="eyebrow">What it means</p>
+    <h2 id="means-h">Public ratings are already in the price</h2>
+    <p>By the night before, the market already reflects what public team ratings know, and a minutes-based read of who is sitting adds nothing measurable. That matches the common view that you can't beat the market with public numbers, and here it is measured, with each rule fixed before the result.</p>
+    <p>Edges, where they exist, come from information and speed. These were not tested:</p>
+    <ul class="plain">
+      <li>Valuing players individually, so a missing star counts for more than a missing role player.</li>
+      <li>Slow books that lag a sharp book's move. Our snapshots, seven a day, are likely too coarse.</li>
+      <li>Softer markets: totals, first halves, player props.</li>
+      <li>The very first numbers posted, at one or two books. A hint (+0.10 points on 666 games) isn't conclusive.</li>
+    </ul>
+  </section>
+
+  <footer>
+    <p>Code, specs and the dated decision log: <a href="https://github.com/ohektner/shac-sb-index">github.com/ohektner/shac-sb-index</a>. Full write-up with every number: <a href="https://github.com/ohektner/shac-sb-index/blob/main/docs/FINDINGS.md">docs/FINDINGS.md</a>.</p>
+    <p>Data: CollegeBasketballData.com (games, box scores, lines), Bart Torvik's T-Rank (ratings), The Odds API (live and historical lines). Raw data stays private under the sources' terms; only derived numbers appear here.</p>
+    <p>Research, not betting advice.</p>
+  </footer>
+</main>
+
+<script>
+  (function () {
+    const rows = [
+      { name: "Model v1", est: 0.0148, lo: -0.0019, hi: 0.0314, n: 18299, emph: true },
+      { name: "Torvik's number", est: 0.0060, lo: -0.0107, hi: 0.0226, n: 18299 },
+      { name: "Coin flip", est: 0.0127, lo: -0.0040, hi: 0.0293, n: 18299 },
+      { name: "Always home", est: 0.0534, lo: 0.0367, hi: 0.0700, n: 18299 },
+      { name: "Always the underdog", est: -0.0591, lo: -0.0757, hi: -0.0424, n: 18033 }
+    ];
+    const domain = [-0.1, 0.1];
+    const ticks = [-0.1, -0.05, 0, 0.05, 0.1];
+    const SVG = "http://www.w3.org/2000/svg";
+    const fmt = (v, d) => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(d);
+    const host = document.getElementById("clv-chart");
+    const panel = host.closest(".chart-panel");
+    let tip = null;
+
+    function el(tag, attrs, parent) {
+      const node = document.createElementNS(SVG, tag);
+      for (const k in attrs) node.setAttribute(k, attrs[k]);
+      if (parent) parent.appendChild(node);
+      return node;
+    }
+
+    function showTip(row, cx, cy) {
+      if (!tip) {
+        tip = document.createElement("div");
+        tip.className = "tip";
+        tip.setAttribute("role", "status");
+        panel.appendChild(tip);
+      }
+      tip.innerHTML = "<strong>" + row.name + "</strong>" +
+        "<span class='t-num'>" + fmt(row.est, 3) + " pts per game</span><br>" +
+        "<span class='t-num'>95%: " + fmt(row.lo, 3) + " to " + fmt(row.hi, 3) + "</span><br>" +
+        "<span class='t-num'>" + row.n.toLocaleString("en-US") + " games</span>";
+      tip.hidden = false;
+      const pw = panel.clientWidth;
+      const tw = tip.offsetWidth;
+      let left = cx + 14;
+      if (left + tw > pw - 8) left = cx - tw - 14;
+      tip.style.left = Math.max(8, left) + "px";
+      tip.style.top = Math.max(8, cy - tip.offsetHeight / 2) + "px";
+    }
+    function hideTip() { if (tip) tip.hidden = true; }
+
+    let lastWidth = 0;
+    function render() {
+      const width = host.clientWidth;
+      if (!width || width === lastWidth) return;
+      lastWidth = width;
+      hideTip();
+      host.textContent = "";
+      const labelW = width < 480 ? 118 : 160;
+      const right = 12;
+      const rowH = 40;
+      const top = 4;
+      const axisH = 28;
+      const height = top + rows.length * rowH + axisH;
+      const x0 = labelW;
+      const x1 = width - right;
+      const x = (v) => x0 + ((v - domain[0]) / (domain[1] - domain[0])) * (x1 - x0);
+      const svg = el("svg", { viewBox: "0 0 " + width + " " + height, width: width, height: height }, host);
+
+      const plotBottom = top + rows.length * rowH;
+      ticks.forEach((t) => {
+        el("line", { x1: x(t), x2: x(t), y1: top, y2: plotBottom, class: t === 0 ? "c-zero" : "c-grid" }, svg);
+        const lab = el("text", { x: x(t), y: plotBottom + 18, "text-anchor": "middle", class: "c-tick" }, svg);
+        lab.textContent = t === 0 ? "0" : fmt(t, 2);
+      });
+
+      rows.forEach((r, i) => {
+        const cy = top + i * rowH + rowH / 2;
+        const g = el("g", {
+          class: "c-row", tabindex: "0", role: "img",
+          "aria-label": r.name + ": " + fmt(r.est, 3) + " points per game, 95% interval " + fmt(r.lo, 3) + " to " + fmt(r.hi, 3) + ", " + r.n.toLocaleString("en-US") + " games"
+        }, svg);
+        el("rect", { x: 0, y: top + i * rowH, width: width, height: rowH, class: "c-hit", rx: 3 }, g);
+        const name = el("text", { x: 0, y: cy + 5, class: "c-label" + (r.emph ? " emph" : "") }, g);
+        name.textContent = r.name;
+        el("line", { x1: x(r.lo), x2: x(r.hi), y1: cy, y2: cy, class: "c-int" + (r.emph ? " emph" : "") }, g);
+        el("circle", { cx: x(r.est), cy: cy, r: 5, class: "c-dot" + (r.emph ? " emph" : "") }, g);
+        if (r.emph) {
+          const vx = x(r.hi) + 8;
+          const v = el("text", { x: vx, y: cy + 4, class: "c-value" }, g);
+          v.textContent = fmt(r.est, 3);
+          if (vx + 44 > width) { v.setAttribute("x", x(r.lo) - 8); v.setAttribute("text-anchor", "end"); }
+        }
+        const point = () => {
+          const box = host.getBoundingClientRect();
+          const pbox = panel.getBoundingClientRect();
+          showTip(r, box.left - pbox.left + x(r.est), box.top - pbox.top + cy);
+        };
+        g.addEventListener("pointerenter", point);
+        g.addEventListener("pointerleave", hideTip);
+        g.addEventListener("focus", point);
+        g.addEventListener("blur", hideTip);
+      });
+    }
+
+    render();
+    if ("ResizeObserver" in window) {
+      let frame = 0;
+      new ResizeObserver(() => {
+        cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(render);
+      }).observe(host);
+    } else {
+      window.addEventListener("resize", render);
+    }
+  })();
+</script>
+</body>
+</html>

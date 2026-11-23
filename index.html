@@ -182,6 +182,9 @@
   .wins { list-style: none; margin: 0; padding: 0; display: grid; border-top: 1px solid rgba(24,111,100,.22); }
   .wins li { padding-block: 13px; border-bottom: 1px solid rgba(24,111,100,.22); font-size: 15px; line-height: 1.5; }
   .wins strong { font-weight: 600; }
+  .panel-wide { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px clamp(32px, 4vw, 56px); align-items: start; }
+  .panel-intro { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+  .panel-intro .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 26px; margin-top: 4px; }
 
   /* the deep-teal feature: Touch Dirt AZ */
   .feature { grid-column: 1 / -1; background: var(--deep); color: var(--on-deep); padding: clamp(28px, 4vw, 56px); display: grid; gap: clamp(32px, 4vw, 48px); }
@@ -209,6 +212,7 @@
   @media (max-width: 1000px) { .spec { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 20px; } }
   @media (max-width: 900px) {
     .work-grid { grid-template-columns: 1fr; }
+    .panel-wide { grid-template-columns: 1fr; }
     .feature-top { grid-template-columns: 1fr; }
     .brand-row { grid-template-columns: 56px minmax(0, 1fr); }
     .brand-row img { width: 56px; height: 56px; }
@@ -354,7 +358,7 @@
     <div class="wrap">
       <div class="section-head">
         <h2 class="h2 words">AI and automation work</h2>
-        <p>Processes I took the manual steps out of, and a site I built end to end.</p>
+        <p>Processes I took the manual steps out of, a site I built end to end, and a forecasting model I tested against the market.</p>
       </div>
 
       <div class="work-grid">
@@ -418,6 +422,23 @@
               <a class="chip-link" href="https://www.instagram.com/touchdirtaz/" target="_blank" rel="noopener">Instagram @touchdirtaz</a>
             </div>
           </div>
+        </article>
+
+        <article class="panel wall-2 panel-wide fade-up" aria-labelledby="shac-title">
+          <div class="panel-intro">
+            <h3 id="shac-title">Shac SB Index, a college basketball forecasting model</h3>
+            <p class="meta">Side project · 2026</p>
+            <p>A point-spread model built only from what was known before each tip-off, then tested against the betting market three ways over four seasons. I wrote down each test's rules before running it. The answer was no all three times, and the case study shows how I checked.</p>
+            <div class="actions">
+              <a class="btn btn-teal" href="shac/">Read the case study</a>
+              <a class="link" href="https://github.com/ohektner/shac-sb-index" target="_blank" rel="noopener">Code on GitHub</a>
+            </div>
+          </div>
+          <ul class="wins">
+            <li><strong>No hindsight.</strong> Bart Torvik's team ratings rebuilt from his daily archives, so each of 22,132 games uses only ratings published before it was played.</li>
+            <li><strong>Caught bad data.</strong> An early 10–1 record came from historical lines stored on the wrong team. Two checks now drop those 63 lines.</li>
+            <li><strong>Stack.</strong> Python, SQL and scheduled GitHub Actions jobs that save timestamped odds and ratings, built with Claude Code from written specs.</li>
+          </ul>
         </article>
       </div>
 
